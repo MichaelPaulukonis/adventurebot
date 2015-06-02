@@ -24,6 +24,8 @@ var sequencer = function(list, config) {
   // TODO: this should be passed in as a parameter, not hard-coded!
   // var list = require('./packages.txt');
   query.connectionParameters = config.pgconn;
+  var dbExists = false;
+  var recordExists = false;
   var index = 0;
 
   this.dropDB = function() {
@@ -37,6 +39,7 @@ var sequencer = function(list, config) {
           console.log('DB drop error: ', err);
           status = 'DB drop error: ' + err.toString();
         } else {
+          dbExists = false;
           status = 'Database dropped';
           console.log(status);
         }
@@ -59,17 +62,47 @@ var sequencer = function(list, config) {
       query(DB_CREATE, function(err, rows, result) {
         var status;
         if (err) {
-          console.log('DB init error: ', err);
           status = 'DB init error: ' + err.toString();
         } else {
+          dbExists = true;
           status = 'Database initialized';
-          console.log(status);
         }
+        console.log(status);
         dfd.resolve(status);
       });
     } catch (e) {
       console.log('DB init error: ', e.toString());
       dfd.resolve('DB init error: ' + e.toString());
+    }
+
+    return dfd.promise();
+
+  };
+
+  this.initRecord = function() {
+    var dfd = new _.Deferred();
+    var status;
+
+    if (recordExists) {
+      status = 'DB initialized with first record';
+      dfd.resolve(status);
+    } else {
+      try {
+        query(DB_INIT_RECORD, function(err, rows, data) {
+
+          if (err) {
+            status = 'initRecord error: ' + err.toString();
+          } else {
+            recordExists = true;
+            status = 'DB initialized with first record';
+          }
+          console.log(status);
+          dfd.resolve(status);
+        });
+      } catch (e) {
+        console.log('initRecord error: ', e.toString());
+        dfd.resolve('initRecord error: ' + e.toString());
+      }
     }
 
     return dfd.promise();
@@ -82,32 +115,43 @@ var sequencer = function(list, config) {
   this.next = function() {
     var dfd = new _.Deferred();
 
-    query(DB_QUERY, function(err, rows, data) {
-      if (err) {
-        dfd.resolve('QUERY ERROR: ' + err);
-      } else {
+    // TODO: init db
+    // if no rows, init Record
 
-        if (rows.length == 0) {
-          query(DB_INIT_RECORD, function(err, rows, data) {
-            // UGH WE R NESTING AGAIN
-            console.log('DB initialized with first record');
-          });
+    _.when(
+      // TODO: this should also init the database.....
+      this.initRecord()
+    ).then(function() {
+
+      query(DB_QUERY, function(err, rows, data) {
+        if (err) {
+          dfd.resolve('QUERY ERROR: ' + err);
         } else {
-          console.log('list:', list);
-          var currentIndex = (rows[0].currentindex + 1) % list.length;
-          var sentence = list[currentIndex];
-          console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
-          query(DB_UPDATE, function(err) {
-            if (err) dfd.resolve('DB_UPDATE error: ' + err);
-            dfd.resolve(sentence);
-          });
+
+          var getit = function() {
+            console.log('list:', list);
+            var currentIndex = (rows[0].currentindex + 1) % list.length;
+            var sentence = list[currentIndex];
+            console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
+            query(DB_UPDATE, function(err) {
+              if (err) dfd.resolve('DB_UPDATE error: ' + err);
+              dfd.resolve(sentence);
+            });
+
+          };
+
+          if (rows.length == 0) {
+            dfd.resolve('UNKNOWN ERROR - NO ROWS RETURNED');
+          } else {
+            getit();
+          }
         }
-      }
+      });
     });
-
     return dfd.promise();
-
   };
+
+
 
 };
 
