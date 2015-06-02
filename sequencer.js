@@ -1,24 +1,54 @@
-var config = require('./config.js');
+// var config = require('./config.js');
 var query = require('pg-query');
 var _ = require('underscore');
 _.mixin(require('underscore.deferred'));
 
-query.connectionParameters = config.database_url;
+// var conString = "postgres://username:password@localhost/database";
+// DATABASE_URL="postgres://postgres:password@localhost:5432/postgres"
 
-var DB_CREATE = 'CREATE TABLE IF NOT EXISTS sequence '
-      + '(currentIndex integer NOT NULL)';
+query.connectionParameters = "postgres://postgres:password@localhost:5432/postgres";
+
+var DB_CREATE = 'CREATE TABLE IF NOT EXISTS sequence'
+      + ' (currentIndex integer NOT NULL)';
 var DB_QUERY = 'SELECT currentIndex FROM sequence';
 var DB_UPDATE = 'UPDATE sequence SET currentIndex = currentIndex + 1';
 var DB_INIT_RECORD = 'INSERT INTO sequence(currentIndex) values(-1)';
-
+var DB_DROP = 'DROP TABLE IF EXISTS sequence';
 // TODO: would be nice if we could set this up as a DB _or_ as a text-file based
 // FROM THE SAME PIECE OF CODE
 // or that could also be a well-gilded lily
-var sequencer = function() {
+// TODO: take in list, as well as config
+// defined in code or local-file, that's up to the user of this code, not this code
+var sequencer = function(list, config) {
 
   // TODO: this should be passed in as a parameter, not hard-coded!
-  var list = require('./packages.txt');
+  // var list = require('./packages.txt');
+  query.connectionParameters = config.pgconn;
   var index = 0;
+
+  this.dropDB = function() {
+    var dfd = new _.Deferred();
+
+    console.log('removing DB');
+    try {
+      query(DB_DROP, function(err, rows, result) {
+        var status;
+        if (err) {
+          console.log('DB drop error: ', err);
+          status = 'DB drop error: ' + err.toString();
+        } else {
+          status = 'Database dropped';
+          console.log(status);
+        }
+        dfd.resolve(status);
+      });
+    } catch (e) {
+      console.log('DB drop error: ', e.toString());
+      dfd.resolve('DB drop error: ' + e.toString());
+    }
+
+    return dfd.promise();
+  };
 
   this.initDB = function() {
 
@@ -46,7 +76,9 @@ var sequencer = function() {
 
   };
 
-
+  // TODO: if don't know if the db exists
+  // try creating it, initializing the first record
+  // and remembering all of this.
   this.next = function() {
     var dfd = new _.Deferred();
 
@@ -61,9 +93,10 @@ var sequencer = function() {
             console.log('DB initialized with first record');
           });
         } else {
-          var currentIndex = rows[0].currentindex + 1;
-          console.log('currentIndex: ', currentIndex);
+          console.log('list:', list);
+          var currentIndex = (rows[0].currentindex + 1) % list.length;
           var sentence = list[currentIndex];
+          console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
           query(DB_UPDATE, function(err) {
             if (err) dfd.resolve('DB_UPDATE error: ' + err);
             dfd.resolve(sentence);
