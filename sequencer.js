@@ -56,23 +56,29 @@ var sequencer = function(list, config) {
   this.initDB = function() {
 
     var dfd = new _.Deferred();
+    var status;
 
-    console.log('initializing DB');
-    try {
-      query(DB_CREATE, function(err, rows, result) {
-        var status;
-        if (err) {
-          status = 'DB init error: ' + err.toString();
-        } else {
-          dbExists = true;
-          status = 'Database initialized';
-        }
-        console.log(status);
-        dfd.resolve(status);
-      });
-    } catch (e) {
-      console.log('DB init error: ', e.toString());
-      dfd.resolve('DB init error: ' + e.toString());
+    if (dbExists) {
+      status = 'DB already exists';
+      dfd.resolve(status);
+    } else {
+      console.log('initializing DB');
+      try {
+        query(DB_CREATE, function(err, rows, result) {
+
+          if (err) {
+            status = 'DB init error: ' + err.toString();
+          } else {
+            dbExists = true;
+            status = 'Database initialized';
+          }
+          console.log(status);
+          dfd.resolve(status);
+        });
+      } catch (e) {
+        console.log('DB init error: ', e.toString());
+        dfd.resolve('DB init error: ' + e.toString());
+      }
     }
 
     return dfd.promise();
@@ -83,8 +89,9 @@ var sequencer = function(list, config) {
     var dfd = new _.Deferred();
     var status;
 
+    /// ouch. should check first - this is AWLAYS re-initializing....
     if (recordExists) {
-      status = 'DB initialized with first record';
+      status = 'records already initialized';
       dfd.resolve(status);
     } else {
       try {
@@ -94,7 +101,7 @@ var sequencer = function(list, config) {
             status = 'initRecord error: ' + err.toString();
           } else {
             recordExists = true;
-            status = 'DB initialized with first record';
+            status = 'storage initialized with first record';
           }
           console.log(status);
           dfd.resolve(status);
@@ -114,13 +121,37 @@ var sequencer = function(list, config) {
   // and remembering all of this.
   this.next = function() {
     var dfd = new _.Deferred();
+    var initRecord = this.initRecord;
 
-    // TODO: init db
-    // if no rows, init Record
+    var getit = function(rows) {
+      // console.log('list:', list);
+      var currentIndex = (rows[0].currentindex + 1) % list.length;
+      var sentence = list[currentIndex];
+      console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
+      query(DB_UPDATE, function(err) {
+        if (err) dfd.resolve('DB_UPDATE error: ' + err);
+        dfd.resolve(sentence);
+      });
+
+    };
+
+    var recordCheck = function(rows) {
+      var dfd = new _.Deferred();
+      if (rows.length == 0) {
+        console.log('no rows, initializing.....');
+        _.when(
+          initRecord()
+        ).done(
+          dfd.resolve()
+        );
+      } else {
+        dfd.resolve();
+      }
+      return dfd.promise();
+    };
 
     _.when(
-      // TODO: this should also init the database.....
-      this.initRecord()
+      this.initDB()
     ).then(function() {
 
       query(DB_QUERY, function(err, rows, data) {
@@ -128,23 +159,12 @@ var sequencer = function(list, config) {
           dfd.resolve('QUERY ERROR: ' + err);
         } else {
 
-          var getit = function() {
-            console.log('list:', list);
-            var currentIndex = (rows[0].currentindex + 1) % list.length;
-            var sentence = list[currentIndex];
-            console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
-            query(DB_UPDATE, function(err) {
-              if (err) dfd.resolve('DB_UPDATE error: ' + err);
-              dfd.resolve(sentence);
-            });
-
-          };
-
-          if (rows.length == 0) {
-            dfd.resolve('UNKNOWN ERROR - NO ROWS RETURNED');
-          } else {
-            getit();
-          }
+          _.when(
+            recordCheck(rows)
+          ).done(function() {
+            console.log('check complete, go get something');
+            getit(rows);
+          });
         }
       });
     });
