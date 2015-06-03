@@ -139,14 +139,16 @@ var sequencer = function(list, config) {
       var dfd = new _.Deferred();
       if (rows.length == 0) {
         console.log('no rows, initializing.....');
-        _.when(
+        dfd.then(
           initRecord()
-        ).done(
-          dfd.resolve()
-        );
+        ).done(function() {
+          console.log('DONE');
+          dfd.resolve();
+        });
       } else {
         dfd.resolve();
       }
+      console.log('TEST TEST');
       return dfd.promise();
     };
 
@@ -162,6 +164,8 @@ var sequencer = function(list, config) {
           _.when(
             recordCheck(rows)
           ).done(function() {
+            // the thing is... IT'S NOT COMPLETE
+            // initRecord() is still running when this shows up....
             console.log('check complete, go get something');
             getit(rows);
           });
