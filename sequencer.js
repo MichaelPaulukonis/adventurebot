@@ -29,7 +29,7 @@ var sequencer = function(list, config) {
   var index = 0;
 
   this.dropDB = function() {
-    var dfd = new _.Deferred();
+    var dfd = _.Deferred();
 
     console.log('removing DB');
     try {
@@ -55,7 +55,7 @@ var sequencer = function(list, config) {
 
   this.initDB = function() {
 
-    var dfd = new _.Deferred();
+    var dfd = _.Deferred();
     var status;
 
     if (dbExists) {
@@ -86,7 +86,7 @@ var sequencer = function(list, config) {
   };
 
   this.initRecord = function() {
-    var dfd = new _.Deferred();
+    var dfd = _.Deferred();
     var status;
 
     /// ouch. should check first - this is AWLAYS re-initializing....
@@ -120,10 +120,13 @@ var sequencer = function(list, config) {
   // try creating it, initializing the first record
   // and remembering all of this.
   this.next = function() {
-    var dfd = new _.Deferred();
+    var dfd = _.Deferred();
     var initRecord = this.initRecord;
+    var next = this.next;
 
     var getit = function(rows) {
+      // if rows is empty, there is an error, but it is swallowed??!??
+      console.log('rows: ', rows);
       // console.log('list:', list);
       var currentIndex = (rows[0].currentindex + 1) % list.length;
       var sentence = list[currentIndex];
@@ -136,46 +139,73 @@ var sequencer = function(list, config) {
     };
 
     var recordCheck = function(rows) {
-      var dfd = new _.Deferred();
+      var dfd = _.Deferred();
       if (rows.length == 0) {
         console.log('no rows, initializing.....');
-        dfd.then(
+        _.when(
           initRecord()
-        ).done(function() {
-          console.log('DONE');
-          dfd.resolve();
-        });
+        ).then(
+          function() {
+            console.log('RECORD CHECK DONE');
+            _.when(
+              doQuery()
+            ).then(
+              function(rows) {
+                dfd.resolve(rows);
+              }
+            );
+          }
+        );
       } else {
-        dfd.resolve();
+        dfd.resolve(rows);
       }
       console.log('TEST TEST');
       return dfd.promise();
     };
 
-    _.when(
-      this.initDB()
-    ).then(function() {
+
+    var doQuery = function() {
+      var dfd = _.Deferred();
 
       query(DB_QUERY, function(err, rows, data) {
         if (err) {
           dfd.resolve('QUERY ERROR: ' + err);
         } else {
-
-          _.when(
-            recordCheck(rows)
-          ).done(function() {
-            // the thing is... IT'S NOT COMPLETE
-            // initRecord() is still running when this shows up....
-            console.log('check complete, go get something');
-            getit(rows);
-          });
+          console.log('query done');
+          dfd.resolve(rows);
         }
       });
-    });
+
+      return dfd.promise();
+    };
+
+    _.when(
+      this.initDB()
+    ).then(
+      function() {
+
+        _.when(
+          doQuery()
+        ).then(
+          function(rows) {
+            // TODO
+            console.log('new rows: ', rows);
+            _.when(
+              recordCheck(rows) // nope -- needs the rows object. AAARGH
+            ).then(
+              function(rows) {
+                console.log('post-check rows: ', rows);
+                getit(rows);
+              }
+            );
+          }
+        );
+
+      });
+
     return dfd.promise();
+
   };
-
-
 
 };
 
