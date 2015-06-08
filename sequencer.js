@@ -6,14 +6,6 @@ _.mixin(require('underscore.deferred'));
 // var conString = "postgres://username:password@localhost/database";
 // DATABASE_URL="postgres://postgres:password@localhost:5432/postgres"
 
-query.connectionParameters = "postgres://postgres:password@localhost:5432/postgres";
-
-var DB_CREATE = 'CREATE TABLE IF NOT EXISTS sequence'
-      + ' (currentIndex integer NOT NULL)';
-var DB_QUERY = 'SELECT currentIndex FROM sequence';
-var DB_UPDATE = 'UPDATE sequence SET currentIndex = currentIndex + 1';
-var DB_INIT_RECORD = 'INSERT INTO sequence(currentIndex) values(-1)';
-var DB_DROP = 'DROP TABLE IF EXISTS sequence';
 // TODO: would be nice if we could set this up as a DB _or_ as a text-file based
 // FROM THE SAME PIECE OF CODE
 // or that could also be a well-gilded lily
@@ -21,32 +13,51 @@ var DB_DROP = 'DROP TABLE IF EXISTS sequence';
 // defined in code or local-file, that's up to the user of this code, not this code
 var sequencer = function(list, config) {
 
-  // TODO: this should be passed in as a parameter, not hard-coded!
-  // var list = require('./packages.txt');
+
+
+query.connectionParameters = "postgres://postgres:password@localhost:5432/postgres";
+
+  // TODO: pass in table-suffix as part of config
+  var DB_CREATE = 'CREATE TABLE IF NOT EXISTS sequence'
+      + ' (currentIndex integer NOT NULL)';
+  var DB_QUERY = 'SELECT currentIndex FROM sequence';
+  var DB_UPDATE = 'UPDATE sequence SET currentIndex = currentIndex + 1';
+  var DB_INIT_RECORD = 'INSERT INTO sequence(currentIndex) values(-1)';
+  var DB_DROP = 'DROP TABLE IF EXISTS sequence';
+
   query.connectionParameters = config.pgconn;
   var dbExists = false;
   var recordExists = false;
   var index = 0;
 
+  var logger = function(msg) {
+    if(!config.log) return;
+
+    for (var i = 0; i < arguments.length; i++) {
+      console.log(arguments[i]);
+    }
+  };
+
   this.dropDB = function() {
     var dfd = _.Deferred();
 
-    console.log('removing DB');
+    logger('removing DB');
     try {
       query(DB_DROP, function(err, rows, result) {
         var status;
         if (err) {
-          console.log('DB drop error: ', err);
+          logger('DB drop error: ', err);
           status = 'DB drop error: ' + err.toString();
         } else {
           dbExists = false;
           status = 'Database dropped';
-          console.log(status);
+          logger(status);
         }
         dfd.resolve(status);
       });
     } catch (e) {
-      console.log('DB drop error: ', e.toString());
+      console.log(e);
+      logger('DB drop error: ', e.toString());
       dfd.resolve('DB drop error: ' + e.toString());
     }
 
@@ -62,7 +73,7 @@ var sequencer = function(list, config) {
       status = 'DB already exists';
       dfd.resolve(status);
     } else {
-      console.log('initializing DB');
+      logger('initializing DB');
       try {
         query(DB_CREATE, function(err, rows, result) {
 
@@ -72,11 +83,11 @@ var sequencer = function(list, config) {
             dbExists = true;
             status = 'Database initialized';
           }
-          console.log(status);
+          logger(status);
           dfd.resolve(status);
         });
       } catch (e) {
-        console.log('DB init error: ', e.toString());
+        logger('DB init error: ', e.toString());
         dfd.resolve('DB init error: ' + e.toString());
       }
     }
@@ -103,11 +114,11 @@ var sequencer = function(list, config) {
             recordExists = true;
             status = 'storage initialized with first record';
           }
-          console.log(status);
+          logger(status);
           dfd.resolve(status);
         });
       } catch (e) {
-        console.log('initRecord error: ', e.toString());
+        logger('initRecord error: ', e.toString());
         dfd.resolve('initRecord error: ' + e.toString());
       }
     }
@@ -121,16 +132,17 @@ var sequencer = function(list, config) {
   // and remembering all of this.
   this.next = function() {
     var dfd = _.Deferred();
+    var p = dfd.promise();
     var initRecord = this.initRecord;
     var next = this.next;
 
     var getit = function(rows) {
       // if rows is empty, there is an error, but it is swallowed??!??
-      console.log('rows: ', rows);
-      // console.log('list:', list);
+      logger('rows: ', rows);
+      // logger('list:', list);
       var currentIndex = (rows[0].currentindex + 1) % list.length;
       var sentence = list[currentIndex];
-      console.log('currentIndex: ', currentIndex, '\nsentence: ', sentence);
+      logger('currentIndex: ', currentIndex, '\nsentence: ', sentence);
       query(DB_UPDATE, function(err) {
         if (err) dfd.resolve('DB_UPDATE error: ' + err);
         dfd.resolve(sentence);
@@ -141,12 +153,12 @@ var sequencer = function(list, config) {
     var recordCheck = function(rows) {
       var dfd = _.Deferred();
       if (rows.length == 0) {
-        console.log('no rows, initializing.....');
+        logger('no rows, initializing.....');
         _.when(
           initRecord()
         ).then(
           function() {
-            console.log('RECORD CHECK DONE');
+            logger('RECORD CHECK DONE');
             _.when(
               doQuery()
             ).then(
@@ -159,25 +171,27 @@ var sequencer = function(list, config) {
       } else {
         dfd.resolve(rows);
       }
-      console.log('TEST TEST');
+      logger('TEST TEST');
       return dfd.promise();
     };
 
 
     var doQuery = function() {
+      logger('doing query');
       var dfd = _.Deferred();
 
       query(DB_QUERY, function(err, rows, data) {
         if (err) {
           dfd.resolve('QUERY ERROR: ' + err);
         } else {
-          console.log('query done');
+          logger('query done');
           dfd.resolve(rows);
         }
       });
 
       return dfd.promise();
     };
+
 
     _.when(
       this.initDB()
@@ -189,12 +203,12 @@ var sequencer = function(list, config) {
         ).then(
           function(rows) {
             // TODO
-            console.log('new rows: ', rows);
+            logger('new rows: ', rows);
             _.when(
               recordCheck(rows) // nope -- needs the rows object. AAARGH
             ).then(
               function(rows) {
-                console.log('post-check rows: ', rows);
+                logger('post-check rows: ', rows);
                 getit(rows);
               }
             );
@@ -204,6 +218,7 @@ var sequencer = function(list, config) {
       });
 
     return dfd.promise();
+    // return dfd.resolve();
 
   };
 
