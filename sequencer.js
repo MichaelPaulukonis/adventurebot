@@ -13,17 +13,14 @@ _.mixin(require('underscore.deferred'));
 // defined in code or local-file, that's up to the user of this code, not this code
 var sequencer = function(list, config) {
 
-
-
-query.connectionParameters = "postgres://postgres:password@localhost:5432/postgres";
-
   // TODO: pass in table-suffix as part of config
-  var DB_CREATE = 'CREATE TABLE IF NOT EXISTS sequence'
+  var tableName = 'sequence' + (config.tableSuffix ? '_' + config.tableSuffix : '');
+  var DB_CREATE = 'CREATE TABLE IF NOT EXISTS '+ tableName
       + ' (currentIndex integer NOT NULL)';
-  var DB_QUERY = 'SELECT currentIndex FROM sequence';
-  var DB_UPDATE = 'UPDATE sequence SET currentIndex = currentIndex + 1';
-  var DB_INIT_RECORD = 'INSERT INTO sequence(currentIndex) values(-1)';
-  var DB_DROP = 'DROP TABLE IF EXISTS sequence';
+  var DB_QUERY = 'SELECT currentIndex FROM ' + tableName;
+  var DB_UPDATE = 'UPDATE ' + tableName + ' SET currentIndex = currentIndex + 1';
+  var DB_INIT_RECORD = 'INSERT INTO ' + tableName + '(currentIndex) values(-1)';
+  var DB_DROP = 'DROP TABLE IF EXISTS ' + tableName;
 
   query.connectionParameters = config.pgconn;
   var dbExists = false;

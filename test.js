@@ -3,12 +3,12 @@ var _ = require('underscore');
 _.mixin(require('underscore.deferred'));
 
 
-var list = ['first', 'second', 'third'];
+var list = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'sevent', 'apple', 'cart'];
 
 var config = {
   pgconn: 'postgres://postgres:password@localhost:5432/postgres',
-  log: false,
-  tableSuffix: 'count'
+  log: false
+  ,  tableSuffix: 'count'
 };
 
 var sequencer = new (require('./sequencer.js'))(list, config);
