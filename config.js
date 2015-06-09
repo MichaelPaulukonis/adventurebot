@@ -13,5 +13,9 @@ module.exports = {
     tweet_on:             (process.env.TWEET_ON.toLowerCase() === 'true'),
     log:                  (process.env.LOG.toLowerCase() === 'true'),
     seconds:              parseInt(process.env.SECONDS, 10),
-    minutes:              parseInt(process.env.MINUTES, 10)
+    minutes:              parseInt(process.env.MINUTES, 10),
+
+    pgconn:               'postgres://postgres:password@localhost:5432/postgres',
+    tableSuffix:          'count'
+
 };

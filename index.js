@@ -2,7 +2,9 @@
 var config = require('./config.js');
 var Twit = require('twit');
 var T = new Twit(config);
-var sequencer = new (require('./sequencer.js'))(require('./packages.txt'));
+// TODO: supply both list and config
+var list = require('./directions.txt');
+var sequencer = new (require('./sequencer.js'))(list, config);
 var pg = require('pg');
 var _ = require('underscore');
 _.mixin(require('underscore.deferred'));
@@ -12,7 +14,7 @@ var logger = function(msg) {
   if (config.log) console.log(msg);
 };
 
-var tweeter = function(texts) {
+var tweeter = function() {
 
   _.when(
     sequencer.next()

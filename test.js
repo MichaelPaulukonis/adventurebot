@@ -8,7 +8,7 @@ var list = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'sevent', 'a
 var config = {
   pgconn: 'postgres://postgres:password@localhost:5432/postgres',
   log: false
-  ,  tableSuffix: 'count'
+  // ,  tableSuffix: 'count'
 };
 
 var sequencer = new (require('./sequencer.js'))(list, config);
