@@ -16,7 +16,8 @@ var sequencer = function(list, config) {
   var DB_INIT_RECORD = 'INSERT INTO ' + tableName + '(currentIndex) values(-1)';
   var DB_DROP = 'DROP TABLE IF EXISTS ' + tableName;
 
-  query.connectionParameters = config.pgconn;
+  // query.connectionParameters = config.pgconn;
+  query.connectionParameters = config.database_url;
   var dbExists = false;
   var recordExists = false;
   var index = 0;
