@@ -1,16 +1,10 @@
-// var config = require('./config.js');
 var query = require('pg-query');
 var _ = require('underscore');
 _.mixin(require('underscore.deferred'));
 
-// var conString = "postgres://username:password@localhost/database";
-// DATABASE_URL="postgres://postgres:password@localhost:5432/postgres"
-
 // TODO: would be nice if we could set this up as a DB _or_ as a text-file based
 // FROM THE SAME PIECE OF CODE
 // or that could also be a well-gilded lily
-// TODO: take in list, as well as config
-// defined in code or local-file, that's up to the user of this code, not this code
 var sequencer = function(list, config) {
 
   // TODO: pass in table-suffix as part of config
